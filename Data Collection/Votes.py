@@ -1,12 +1,4 @@
 #!/usr/bin/env python3
-"""
-    CDG Examples
-
-    Below are some examples of using the Bill endpoint with XML parsing.
-
-    @copyright: 2022, Library of Congress
-    @license: CC0 1.0
-"""
 import xml.etree.ElementTree as ET
 import requests
 import json
