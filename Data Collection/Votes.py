@@ -16,7 +16,7 @@ def get_bills(client):
     RETURNS a list of 4-tuples (see desc below)
     """
     all_bills = []
-    endpoint = f"bill"
+    endpoint = "bill"
     data, _ = client.get(endpoint)
     root = parse_xml(data)
     count = 0
@@ -30,11 +30,11 @@ def get_bills(client):
         if bill_type != 'hr' and bill_type != 's':
             continue
 
-        
+        # Get bill specific data
         bill_data = get_bill_data(client, bill_congress, bill_type, bill_num)
-        if bill_data is not None:
+        if bill_data is not None and (bill_data[4] or bill_data[5]):
             count += 1
-            print('Vote found')
+            print(bill_data[0], 'Vote found')
             all_bills.append(bill_data)
     print(count)
     return all_bills
@@ -42,12 +42,12 @@ def get_bills(client):
 
 def get_bill_data(client, congress, b_type, b_num):
     client = CDGClient(api_key, response_format="xml")
-    bill_votes = {}
+    
     """
     Given a bill to lookup, returns a dictionary of each legislator ID
     to their vote on the bill.
 
-    RETURNS a 4-tuple (bill_name, bill_policy_area, bill_summary, dict(leg_id -> vote)) if vote present OTHERWISE None
+    RETURNS a 6-tuple (bill_code, bill_name, bill_policy_area, bill_summary, dict_house(leg_id -> vote), dict_senate(leg_id -> vote)) if vote present OTHERWISE None
     """
 
 
@@ -58,23 +58,65 @@ def get_bill_data(client, congress, b_type, b_num):
     data, _ = client.get(endpoint)
     root = parse_xml(data)
 
-    vote_url = root.find(".//actions/item/recordedVotes/recordedVote/url")
-    if vote_url is None: # If a bill does not have a vote
-        print('Bill does not have a vote')
+    house_vote = ''
+    senate_vote = ''
+    for vote in root.findall(".//actions/item/recordedVotes/recordedVote"):
+        chamber = vote.find('chamber').text.strip()
+        url = vote.find('url')
+
+        if url is None:
+            continue
+        else:
+            url = url.text.strip()
+            print(url)
+
+        # Only takes most recent votes if multiple present
+        if chamber == 'Senate' and not senate_vote:
+            senate_vote = url
+        elif chamber == 'House' and not house_vote:
+            house_vote = url
+        
+        # If we have found a link for both houses
+        if house_vote and senate_vote:
+            break
+
+    """
+    Handles HOUSE voting
+    """
+    house_votes = {}
+    if house_vote:
+        # Gets the XML data from the recorded vote
+        response = requests.get(house_vote)
+        tree = ET.ElementTree(ET.fromstring(response.content))
+        root = tree.getroot()
+
+        # Extracts each legislator and their vote for the bill
+        for recorded_vote in root.findall('.//recorded-vote'):
+            legislator_id = recorded_vote.find('legislator').get('name-id')
+            # legislator_name = recorded_vote.find('legislator').get('sort-field')
+            vote = recorded_vote.find('vote').text
+            house_votes[legislator_id] = vote
+
+    """
+    Handles SENATE voting
+    """
+    senate_votes = {}
+    if senate_vote:
+        # Gets the XML data from the recorded vote
+        response = requests.get(senate_vote)
+        tree = ET.ElementTree(ET.fromstring(response.content))
+        root = tree.getroot()
+
+        # Extracts each legislator and their vote for the bill
+        members = root.find('members')
+        for member in members.findall('member'):
+            legislator_id = member.find('lis_member_id').text
+            # legislator_name = member.find('legislator').get('sort-field')
+            vote = member.find('vote_cast').text
+            senate_votes[legislator_id] = vote
+
+    if not house_votes and not senate_votes:
         return None
-    url = vote_url.text.strip()
-
-    # Gets the XML data from the recorded vote
-    response = requests.get(url)
-    tree = ET.ElementTree(ET.fromstring(response.content))
-    root = tree.getroot()
-
-    # Extracts each legislator and their vote for the bill
-    for recorded_vote in root.findall('.//recorded-vote'):
-        legislator_id = recorded_vote.find('legislator').get('name-id')
-        # legislator_name = recorded_vote.find('legislator').get('sort-field')
-        vote = recorded_vote.find('vote').text
-        bill_votes[legislator_id] = vote
 
     """
     Get the bill title and policy area
@@ -93,7 +135,8 @@ def get_bill_data(client, congress, b_type, b_num):
     root = parse_xml(data)
     bill_summ = root.find(".//summaries/summary/text").text.strip()
 
-    return (bill_title, bill_policy_area, bill_summ, bill_votes)
+    bill_code = str(b_type).upper() + str(b_num)
+    return (bill_code, bill_title, bill_policy_area, bill_summ, house_votes, senate_votes)
 
 if __name__ == "__main__":
     """
@@ -111,11 +154,13 @@ if __name__ == "__main__":
     print(f"Contacting Congress.gov, at {client.base_url} ...")
 
     try:
-        json_data = json.dumps(get_bills(client))
-        print(json_data)
+        # print(get_bill_data(client, 118, 'hr', 6009))
+        # exit()
+        data = get_bills(client)
 
-        with open('data.json', 'w') as file:
-            file.write(json_data)
+        # Write data to JSON file
+        with open("votes.json", "w") as json_file:
+            json.dump(data, json_file, indent=6)
 
     except OSError as err:
         print('Error:', err)
