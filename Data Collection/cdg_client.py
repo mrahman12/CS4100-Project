@@ -41,20 +41,17 @@ class CDGClient:
         api_version=API_VERSION,
         response_format=RESPONSE_FORMAT,
         raise_on_error=True,
-        date_from = None,
-        date_to = None,
+        offset = None,
     ):
         self.base_url = urljoin(ROOT_URL, api_version) + "/"
         self._session = requests.Session()
 
         # do not use url parameters, even if offered, use headers
-        if date_from is None and date_to is None:
+        if offset is None:
             self._session.params = {"format": response_format}
         else:
             self._session.params = {"format": response_format,
-                                    "fromDateTime": date_from,
-                                    "toDateTime": date_to,
-                                    "sort": 'updateDate+asc',
+                                    "offset": offset,
                                     "limit": 250
                                     }
         self._session.headers.update({"x-api-key": api_key})
