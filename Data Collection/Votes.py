@@ -2,6 +2,8 @@
 import xml.etree.ElementTree as ET
 import requests
 import json
+import time
+import random
 from cdg_client import CDGClient
 
 api_key = 'Jq9Uy2kgbNouvTJfoixzEYYQQJ88FAjM3D5HFPne'
@@ -20,6 +22,7 @@ def get_bills(client):
     count = 0
     full_count = 0
     for bill in root.findall(".//bills/bill"):
+        time.sleep(random.uniform(0,3))
         bill_congress = bill.find("congress").text.strip()
         bill_type = bill.find("type").text.strip()
         bill_num = bill.find("number").text.strip()
@@ -149,8 +152,8 @@ if __name__ == "__main__":
 
     master_list = []
     
-    round_cnt = 51
-    while round_cnt <= 100:
+    round_cnt = 61
+    while round_cnt <= 1000:
         client = CDGClient(api_key, response_format="xml", offset=(round_cnt * 250))
         print(f"Contacting Congress.gov, at {client.base_url} ...")
         
