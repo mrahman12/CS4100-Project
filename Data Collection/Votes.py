@@ -152,7 +152,7 @@ if __name__ == "__main__":
 
     master_list = []
     
-    round_cnt = 61
+    round_cnt = 108
     while round_cnt <= 1000:
         client = CDGClient(api_key, response_format="xml", offset=(round_cnt * 250))
         print(f"Contacting Congress.gov, at {client.base_url} ...")
